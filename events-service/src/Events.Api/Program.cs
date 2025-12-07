@@ -12,6 +12,7 @@ using Events.Application.Services;
 
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddHealthChecks();
 
 builder.Services.AddEventInfrastructure(builder.Configuration);
 
@@ -91,7 +92,7 @@ if (app.Environment.IsDevelopment())
         o.RoutePrefix = "swagger";
     });
 }
-
+app.UseHealthChecks("/health");
 app.UseAuthentication();
 app.UseAuthorization();
 

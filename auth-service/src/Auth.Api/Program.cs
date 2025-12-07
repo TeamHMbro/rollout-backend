@@ -9,6 +9,8 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddHealthChecks();
+
 builder.Services.AddAuthInfrastructure(builder.Configuration);
 
 var authSection = builder.Configuration.GetSection("Auth");
@@ -88,7 +90,7 @@ if (app.Environment.IsDevelopment())
         options.RoutePrefix = "swagger";
     });
 }
-
+app.UseHealthChecks("/health");
 app.UseAuthentication();
 app.UseAuthorization();
 

@@ -1,0 +1,115 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: rollout-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rollout
+      POSTGRES_PASSWORD: rollout_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - rollout-net
+    ports:
+      - "5432:5432"
+
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    image: rollout-auth-service:local
+    container_name: auth-service
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__AuthDb: Host=postgres;Port=5432;Database=auth_db;Username=rollout;Password=rollout_password
+      Auth__JwtIssuer: rollout-auth
+      Auth__JwtAudience: rollout-api
+      Auth__JwtKey: "this_is_a_very_long_secret_key_at_least_32_chars"
+    depends_on:
+      - postgres
+    networks:
+      - rollout-net
+
+  events-service:
+    build:
+      context: ./events-service
+      dockerfile: Dockerfile
+    image: rollout-events-service:local
+    container_name: events-service
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__EventsDb: Host=postgres;Port=5432;Database=events_db;Username=rollout;Password=rollout_password
+      Auth__JwtIssuer: rollout-auth
+      Auth__JwtAudience: rollout-api
+      Auth__JwtKey: "this_is_a_very_long_secret_key_at_least_32_chars"
+      ChatService__BaseUrl: http://chat-service:8080
+      NotificationService__BaseUrl: http://notifications-service:8080
+    depends_on:
+      - postgres
+    networks:
+      - rollout-net
+
+  chat-service:
+    build:
+      context: ./chat-service
+      dockerfile: Dockerfile
+    image: rollout-chat-service:local
+    container_name: chat-service
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__ChatDb: Host=postgres;Port=5432;Database=chat_db;Username=rollout;Password=rollout_password
+      Auth__JwtIssuer: rollout-auth
+      Auth__JwtAudience: rollout-api
+      Auth__JwtKey: "this_is_a_very_long_secret_key_at_least_32_chars"
+      EventsService__BaseUrl: http://events-service:8080
+    depends_on:
+      - postgres
+      - events-service
+    networks:
+      - rollout-net
+
+  notifications-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    image: rollout-notifications-service:local
+    container_name: notifications-service
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__NotificationsDb: Host=postgres;Port=5432;Database=notifications_db;Username=rollout;Password=rollout_password
+      Auth__JwtIssuer: rollout-auth
+      Auth__JwtAudience: rollout-api
+      Auth__JwtKey: "this_is_a_very_long_secret_key_at_least_32_chars"
+    depends_on:
+      - postgres
+    networks:
+      - rollout-net
+
+  nginx:
+    image: nginx:1.27
+    container_name: rollout-nginx
+    restart: unless-stopped
+    depends_on:
+      - auth-service
+      - events-service
+      - chat-service
+      - notifications-service
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - rollout-net
+
+volumes:
+  postgres_data:
+
+networks:
+  rollout-net:
+    driver: bridge
