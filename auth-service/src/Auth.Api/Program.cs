@@ -84,12 +84,23 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI(options =>
+    app.UseSwaggerUI(c =>
     {
-        options.SwaggerEndpoint("/swagger/v1/swagger.json", "RollOut Auth API v1");
-        options.RoutePrefix = "swagger";
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Auth API v1");
+        c.RoutePrefix = "swagger";
     });
 }
+else
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/auth/swagger/v1/swagger.json", "Auth API v1");
+        c.RoutePrefix = "swagger";
+    });
+}
+
+
 app.UseHealthChecks("/health");
 app.UseAuthentication();
 app.UseAuthorization();
