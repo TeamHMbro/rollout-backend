@@ -1,0 +1,112 @@
+########################
+# OS / system
+########################
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+########################
+# Build / .NET
+########################
+bin/
+obj/
+out/
+[Bb]uild/
+[Ll]og/
+[Ll]ogs/
+
+# Папки publish / артефакты
+**/publish/
+**/app.publish/
+
+# Кэш NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+project.lock.json
+project.fragment.lock.json
+
+# Кэш тестов / coverage
+TestResult*/
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+coverage.info
+.coverage/
+.vscoverage*
+
+########################
+# IDE: Visual Studio / Rider / VS for Mac
+########################
+.vs/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# Rider / ReSharper / JetBrains
+.ReSharper*/
+*_Resharper.*/
+*.DotSettings.user
+.idea/
+.idea/*
+*.sln.iml
+
+# VS for Mac
+*.userprefs
+
+########################
+# VS Code
+########################
+.vscode/
+.history/
+*.code-workspace
+
+########################
+# EF / tooling / migrations cache
+########################
+#migrations-бэкапы (если вдруг появятся)
+*MigrationsBackup*/
+
+########################
+# Secrets / env / local config
+########################
+.env
+.env.*
+.envrc
+
+# dotnet user-secrets (локальное хранилище)
+secrets.json
+
+# Локальные appsettings, которые не должны уходить в репо
+appsettings.Development.json
+appsettings.Local.json
+appsettings.*.local.json
+
+########################
+# Logs / temp
+########################
+*.log
+logs/
+log/
+*.tmp
+tmp/
+temp/
+
+########################
+# Others
+########################
+*.swp
+*.swo
+*.~*
+*.bak
+*.orig
+*.tmp
