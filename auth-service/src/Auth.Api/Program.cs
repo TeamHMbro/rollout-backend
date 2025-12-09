@@ -14,12 +14,11 @@ builder.Services.AddHealthChecks();
 builder.Services.AddAuthInfrastructure(builder.Configuration);
 
 var authSection = builder.Configuration.GetSection("Auth");
-var jwtKey = authSection.GetValue<string>("JwtKey") 
+var jwtKey = authSection.GetValue<string>("JwtKey")
             ?? throw new InvalidOperationException("Auth:JwtKey missing");
 var issuer = authSection.GetValue<string>("JwtIssuer");
 var audience = authSection.GetValue<string>("JwtAudience");
 
-// JWT
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -81,27 +80,15 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Auth API v1");
-        c.RoutePrefix = "swagger";
-    });
-}
-else
-{
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/auth/swagger/v1/swagger.json", "Auth API v1");
-        c.RoutePrefix = "swagger";
-    });
-}
-
+    c.SwaggerEndpoint("v1/swagger.json", "Auth API v1");
+    c.RoutePrefix = "swagger";
+});
 
 app.UseHealthChecks("/health");
+
 app.UseAuthentication();
 app.UseAuthorization();
 
