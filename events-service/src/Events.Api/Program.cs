@@ -6,14 +6,10 @@ using Events.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using System.Security.Claims;
-using Events.Application.EventsContracts;
-using Events.Application.Services;
-
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddHealthChecks();
 
+builder.Services.AddHealthChecks();
 builder.Services.AddEventInfrastructure(builder.Configuration);
 
 var authSection = builder.Configuration.GetSection("Auth");
@@ -41,7 +37,6 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
-// Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -58,7 +53,7 @@ builder.Services.AddSwaggerGen(c =>
         Scheme = "bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "JWT токен в формате: Bearer {token}"
+        Description = "JWT Token"
     };
 
     c.AddSecurityDefinition("Bearer", securityScheme);
@@ -97,17 +92,14 @@ else
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/events/swagger/v1/swagger.json", "Events API v1");
+        c.SwaggerEndpoint("v1/swagger.json", "Events API v1");
         c.RoutePrefix = "swagger";
     });
 }
 
-
 app.UseHealthChecks("/health");
 app.UseAuthentication();
 app.UseAuthorization();
-
-// Endpoints
 
 app.MapPost("/events", async (
     CreateEventRequest request,
@@ -135,7 +127,7 @@ app.MapGet("/events/{id:long}", async (
     return Results.Ok(ev);
 });
 
-app.MapGet("/feed", async (
+app.MapGet("/events/feed", async (
     string? city,
     DateTimeOffset? from,
     DateTimeOffset? to,
@@ -239,7 +231,7 @@ app.MapDelete("/events/{id:long}/save", async (
     return Results.Ok();
 }).RequireAuthorization();
 
-app.MapGet("/me/events/created", async (
+app.MapGet("/events/me/events/created", async (
     ClaimsPrincipal user,
     IEventService service,
     CancellationToken ct) =>
@@ -252,7 +244,7 @@ app.MapGet("/me/events/created", async (
     return Results.Ok(events);
 }).RequireAuthorization();
 
-app.MapGet("/me/events/going", async (
+app.MapGet("/events/me/events/going", async (
     ClaimsPrincipal user,
     IEventService service,
     CancellationToken ct) =>
@@ -265,7 +257,7 @@ app.MapGet("/me/events/going", async (
     return Results.Ok(events);
 }).RequireAuthorization();
 
-app.MapGet("/me/events/saved", async (
+app.MapGet("/events/me/events/saved", async (
     ClaimsPrincipal user,
     IEventService service,
     CancellationToken ct) =>
@@ -278,7 +270,7 @@ app.MapGet("/me/events/saved", async (
     return Results.Ok(events);
 }).RequireAuthorization();
 
-app.MapGet("/me/events/liked", async (
+app.MapGet("/events/me/events/liked", async (
     ClaimsPrincipal user,
     IEventService service,
     CancellationToken ct) =>
@@ -328,6 +320,5 @@ app.MapPost("/events/{id:long}/cancel", async (
     await service.CancelAsync(id, userId, ct);
     return Results.Ok();
 }).RequireAuthorization();
-
 
 app.Run();

@@ -54,7 +54,7 @@ builder.Services.AddSwaggerGen(options =>
         Type = SecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT",
-        Description = "JWT Authorization header using the Bearer scheme."
+        Description = "JWT Token"
     };
     options.AddSecurityDefinition("Bearer", securityScheme);
     options.AddSecurityRequirement(new OpenApiSecurityRequirement { { securityScheme, Array.Empty<string>() } });
@@ -78,7 +78,7 @@ else
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/notifications/swagger/v1/swagger.json", "Notifications API v1");
+        c.SwaggerEndpoint("v1/swagger.json", "Notifications API v1");
         c.RoutePrefix = "swagger";
     });
 }
@@ -118,7 +118,7 @@ app.MapPost("/notifications/mark-read", async (HttpContext context, MarkReadRequ
     return Results.NoContent();
 }).RequireAuthorization();
 
-app.MapPost("/internal/notifications", async (CreateNotificationRequest request, INotificationService service, CancellationToken ct) =>
+app.MapPost("/notifications/internal/notifications", async (CreateNotificationRequest request, INotificationService service, CancellationToken ct) =>
 {
     await service.CreateAsync(request, ct);
     return Results.Accepted();

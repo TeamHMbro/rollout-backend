@@ -65,7 +65,7 @@ builder.Services.AddSwaggerGen(c =>
         Scheme = "bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "JWT Authorization header using the Bearer scheme."
+        Description = "JWT Token"
     };
 
     c.AddSecurityDefinition("Bearer", securityScheme);
@@ -106,11 +106,10 @@ else
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/chat/swagger/v1/swagger.json", "Chat API v1");
+        c.SwaggerEndpoint("v1/swagger.json", "Chat API v1");
         c.RoutePrefix = "swagger";
     });
 }
-
 
 app.UseHealthChecks("/health");
 app.UseAuthentication();
@@ -136,19 +135,19 @@ string GetBearerToken(HttpContext httpContext)
     return header.Trim();
 }
 
-app.MapGet("/events/{eventId:long}/messages", async (long eventId, int page, int pageSize, IChatService chatService, CancellationToken ct) =>
+app.MapGet("/chat/events/{eventId:long}/messages", async (long eventId, int page, int pageSize, IChatService chatService, CancellationToken ct) =>
 {
     var result = await chatService.GetEventMessagesAsync(eventId, page, pageSize, ct);
     return Results.Ok(result);
 }).RequireAuthorization();
 
-app.MapGet("/events/{eventId:long}/messages/recent", async (long eventId, int limit, IChatService chatService, CancellationToken ct) =>
+app.MapGet("/chat/events/{eventId:long}/messages/recent", async (long eventId, int limit, IChatService chatService, CancellationToken ct) =>
 {
     var result = await chatService.GetRecentEventMessagesAsync(eventId, limit, ct);
     return Results.Ok(result);
 }).RequireAuthorization();
 
-app.MapPost("/events/{eventId:long}/messages", async (long eventId, SendEventMessageRequest request, ClaimsPrincipal user, HttpContext httpContext, IEventAccessService eventAccessService, IChatService chatService, CancellationToken ct) =>
+app.MapPost("/chat/events/{eventId:long}/messages", async (long eventId, SendEventMessageRequest request, ClaimsPrincipal user, HttpContext httpContext, IEventAccessService eventAccessService, IChatService chatService, CancellationToken ct) =>
 {
     var userId = GetUserId(user);
     var token = GetBearerToken(httpContext);
@@ -157,14 +156,14 @@ app.MapPost("/events/{eventId:long}/messages", async (long eventId, SendEventMes
     return Results.Ok(result);
 }).RequireAuthorization();
 
-app.MapPatch("/messages/{messageId:long}", async (long messageId, SendEventMessageRequest request, ClaimsPrincipal user, IChatService chatService, CancellationToken ct) =>
+app.MapPatch("/chat/messages/{messageId:long}", async (long messageId, SendEventMessageRequest request, ClaimsPrincipal user, IChatService chatService, CancellationToken ct) =>
 {
     var userId = GetUserId(user);
     var result = await chatService.UpdateEventMessageAsync(messageId, userId, request.Content, ct);
     return Results.Ok(result);
 }).RequireAuthorization();
 
-app.MapDelete("/messages/{messageId:long}", async (long messageId, ClaimsPrincipal user, IChatService chatService, CancellationToken ct) =>
+app.MapDelete("/chat/messages/{messageId:long}", async (long messageId, ClaimsPrincipal user, IChatService chatService, CancellationToken ct) =>
 {
     var userId = GetUserId(user);
     await chatService.DeleteEventMessageAsync(messageId, userId, ct);
