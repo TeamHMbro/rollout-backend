@@ -1,19 +1,22 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:16
     container_name: rollout-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: rollout
-      POSTGRES_PASSWORD: rollout_password
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - rollout-net
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
 
   auth-service:
     build:
@@ -22,14 +25,16 @@ services:
     image: rollout-auth-service:local
     container_name: auth-service
     restart: unless-stopped
-    environment:
-      ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__AuthDb: Host=postgres;Port=5432;Database=auth_db;Username=rollout;Password=rollout_password
-      Auth__JwtIssuer: rollout-auth
-      Auth__JwtAudience: rollout-api
-      Auth__JwtKey: "this_is_a_very_long_secret_key_at_least_32_chars"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Debug
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__AuthDb: Host=postgres;Port=5432;Database=auth_db;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      Auth__JwtIssuer: ${ROLLOUT_JWT_ISSUER}
+      Auth__JwtAudience: ${ROLLOUT_JWT_AUDIENCE}
+      Auth__JwtKey: ${ROLLOUT_JWT_KEY}
     networks:
       - rollout-net
 
@@ -40,16 +45,18 @@ services:
     image: rollout-events-service:local
     container_name: events-service
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
-      ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__EventsDb: Host=postgres;Port=5432;Database=events_db;Username=rollout;Password=rollout_password
-      Auth__JwtIssuer: rollout-auth
-      Auth__JwtAudience: rollout-api
-      Auth__JwtKey: "this_is_a_very_long_secret_key_at_least_32_chars"
+      ASPNETCORE_ENVIRONMENT: Debug
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__EventDb: Host=postgres;Port=5432;Database=events_db;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      Auth__JwtIssuer: ${ROLLOUT_JWT_ISSUER}
+      Auth__JwtAudience: ${ROLLOUT_JWT_AUDIENCE}
+      Auth__JwtKey: ${ROLLOUT_JWT_KEY}
       ChatService__BaseUrl: http://chat-service:8080
       NotificationService__BaseUrl: http://notifications-service:8080
-    depends_on:
-      - postgres
     networks:
       - rollout-net
 
@@ -60,16 +67,19 @@ services:
     image: rollout-chat-service:local
     container_name: chat-service
     restart: unless-stopped
-    environment:
-      ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__ChatDb: Host=postgres;Port=5432;Database=chat_db;Username=rollout;Password=rollout_password
-      Auth__JwtIssuer: rollout-auth
-      Auth__JwtAudience: rollout-api
-      Auth__JwtKey: "this_is_a_very_long_secret_key_at_least_32_chars"
-      EventsService__BaseUrl: http://events-service:8080
     depends_on:
-      - postgres
-      - events-service
+      postgres:
+        condition: service_healthy
+      events-service:
+        condition: service_started
+    environment:
+      ASPNETCORE_ENVIRONMENT: Debug
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__ChatDb: Host=postgres;Port=5432;Database=chat_db;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      Auth__JwtIssuer: ${ROLLOUT_JWT_ISSUER}
+      Auth__JwtAudience: ${ROLLOUT_JWT_AUDIENCE}
+      Auth__JwtKey: ${ROLLOUT_JWT_KEY}
+      EventsService__BaseUrl: http://events-service:8080
     networks:
       - rollout-net
 
@@ -80,14 +90,16 @@ services:
     image: rollout-notifications-service:local
     container_name: notifications-service
     restart: unless-stopped
-    environment:
-      ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__NotificationsDb: Host=postgres;Port=5432;Database=notifications_db;Username=rollout;Password=rollout_password
-      Auth__JwtIssuer: rollout-auth
-      Auth__JwtAudience: rollout-api
-      Auth__JwtKey: "this_is_a_very_long_secret_key_at_least_32_chars"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Debug
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__NotificationsDb: Host=postgres;Port=5432;Database=notifications_db;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      Auth__JwtIssuer: ${ROLLOUT_JWT_ISSUER}
+      Auth__JwtAudience: ${ROLLOUT_JWT_AUDIENCE}
+      Auth__JwtKey: ${ROLLOUT_JWT_KEY}
     networks:
       - rollout-net
 

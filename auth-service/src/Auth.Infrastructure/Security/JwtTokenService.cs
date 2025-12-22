@@ -1,46 +1,54 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Auth.Application;
 using Auth.Application.Abstractions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Auth.Infrastructure.Security;
 
 public sealed class JwtTokenService : IJwtTokenService
 {
-    private readonly AuthOptions _options;
+    private readonly IConfiguration _config;
 
-    public JwtTokenService(AuthOptions options)
+    public JwtTokenService(IConfiguration config)
     {
-        _options = options;
+        _config = config;
     }
 
     public string GenerateAccessToken(Guid userId, string? email, string? phone)
     {
+        var authSection = _config.GetSection("Auth");
+        var issuer = authSection.GetValue<string>("JwtIssuer");
+        var audience = authSection.GetValue<string>("JwtAudience");
+        var jwtKey = authSection.GetValue<string>("JwtKey") ?? throw new InvalidOperationException("Auth:JwtKey missing");
+
+        var accessMinutes = authSection.GetValue<int?>("AccessTokenMinutes") ?? 15;
+
         var claims = new List<Claim>
         {
-            new Claim(JwtRegisteredClaimNames.Sub, userId.ToString())
+            new(JwtRegisteredClaimNames.Sub, userId.ToString())
         };
 
         if (!string.IsNullOrWhiteSpace(email))
-            claims.Add(new Claim(JwtRegisteredClaimNames.Email, email));
+            claims.Add(new Claim("email", email));
 
         if (!string.IsNullOrWhiteSpace(phone))
             claims.Add(new Claim("phone", phone));
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.JwtKey));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
         var now = DateTime.UtcNow;
-        var expires = now.AddMinutes(_options.AccessTokenLifetimeMinutes);
 
         var token = new JwtSecurityToken(
-            issuer: _options.JwtIssuer,
-            audience: _options.JwtAudience,
+            issuer: issuer,
+            audience: audience,
             claims: claims,
-            notBefore: now,
-            expires: expires,
-            signingCredentials: creds);
+            notBefore: null,
+            expires: now.AddMinutes(accessMinutes),
+            signingCredentials: creds
+        );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
