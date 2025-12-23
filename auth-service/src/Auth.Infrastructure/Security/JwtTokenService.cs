@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Auth.Application.Abstractions;
+using Auth.Domain.Users;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
@@ -21,20 +22,21 @@ public sealed class JwtTokenService : IJwtTokenService
         var authSection = _config.GetSection("Auth");
         var issuer = authSection.GetValue<string>("JwtIssuer");
         var audience = authSection.GetValue<string>("JwtAudience");
-        var jwtKey = authSection.GetValue<string>("JwtKey") ?? throw new InvalidOperationException("Auth:JwtKey missing");
+        var jwtKey = authSection.GetValue<string>("JwtKey") ??
+                     throw new InvalidOperationException("Auth:JwtKey missing");
 
-        var accessMinutes = authSection.GetValue<int?>("AccessTokenMinutes") ?? 15;
+        var accessMinutes = authSection.GetValue<int?>("AccessTokenExpirationMinutes") ?? 60;
 
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, userId.ToString())
+            new(JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new(JwtRegisteredClaimNames.Email, email ?? string.Empty)
         };
 
-        if (!string.IsNullOrWhiteSpace(email))
-            claims.Add(new Claim("email", email));
-
         if (!string.IsNullOrWhiteSpace(phone))
+        {
             claims.Add(new Claim("phone", phone));
+        }
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -45,11 +47,16 @@ public sealed class JwtTokenService : IJwtTokenService
             issuer: issuer,
             audience: audience,
             claims: claims,
-            notBefore: null,
+            notBefore: now,
             expires: now.AddMinutes(accessMinutes),
             signingCredentials: creds
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    public string GenerateRefreshToken()
+    {
+        return Convert.ToBase64String(Guid.NewGuid().ToByteArray());
     }
 }

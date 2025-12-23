@@ -34,6 +34,19 @@ builder.Services
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
             ClockSkew = TimeSpan.FromSeconds(30)
         };
+        options.Events = new JwtBearerEvents
+{
+    OnAuthenticationFailed = ctx =>
+    {
+        var logger = ctx.HttpContext.RequestServices
+            .GetRequiredService<ILoggerFactory>()
+            .CreateLogger("Jwt");
+
+        logger.LogError(ctx.Exception, "JWT auth failed");
+        return Task.CompletedTask;
+    }
+};
+
     });
 
 builder.Services.AddAuthorization();

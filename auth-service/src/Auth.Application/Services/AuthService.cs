@@ -120,7 +120,7 @@ public sealed class AuthService : IAuthService
     private async Task<string> IssueRefreshTokenAsync(Guid userId, CancellationToken ct)
     {
         var token = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-        var expires = _clock.UtcNow.AddDays(_options.RefreshTokenLifetimeDays);
+        var expires = _clock.UtcNow.AddDays(_options.RefreshTokenExpirationDays);
         var entity = new RefreshToken(userId, token, expires);
         await _refreshTokens.AddAsync(entity, ct);
         await _refreshTokens.SaveChangesAsync(ct);

@@ -20,26 +20,82 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddHealthChecks();
 builder.Services.AddNotificationsInfrastructure(builder.Configuration);
 
-var jwtIssuer = builder.Configuration["Auth:JwtIssuer"] ?? throw new InvalidOperationException("Auth:JwtIssuer is not configured.");
-var jwtAudience = builder.Configuration["Auth:JwtAudience"] ?? throw new InvalidOperationException("Auth:JwtAudience is not configured.");
-var jwtKey = builder.Configuration["Auth:JwtKey"] ?? throw new InvalidOperationException("Auth:JwtKey is not configured.");
-
+var jwtKey = builder.Configuration["Auth:JwtKey"] ?? throw new InvalidOperationException("Auth:JwtKey missing");
+var issuer = builder.Configuration["Auth:JwtIssuer"];
+var audience = builder.Configuration["Auth:JwtAudience"];
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.IncludeErrorDetails = true;
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuer = jwtIssuer,
+            ValidIssuer = issuer,
             ValidateAudience = true,
-            ValidAudience = jwtAudience,
+            ValidAudience = audience,
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-            ValidateLifetime = true
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(2)
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = ctx =>
+            {
+                var logger = ctx.HttpContext.RequestServices
+                    .GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("Jwt");
+
+                var authHeader = ctx.Request.Headers.Authorization.ToString();
+                logger.LogInformation(
+                    "JWT OnMessageReceived: path={Path}, hasAuthHeader={Has}, startsWithBearer={IsBearer}, authLen={Len}",
+                    ctx.HttpContext.Request.Path.Value,
+                    !string.IsNullOrWhiteSpace(authHeader),
+                    authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase),
+                    authHeader?.Length ?? 0
+                );
+
+                return Task.CompletedTask;
+            },
+
+            OnTokenValidated = ctx =>
+            {
+                var logger = ctx.HttpContext.RequestServices
+                    .GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("Jwt");
+
+                var sub = ctx.Principal?.FindFirst("sub")?.Value;
+                logger.LogInformation("JWT validated OK. sub={Sub}", sub);
+
+                return Task.CompletedTask;
+            },
+
+            OnAuthenticationFailed = ctx =>
+            {
+                var logger = ctx.HttpContext.RequestServices
+                    .GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("Jwt");
+
+                logger.LogError(ctx.Exception, "JWT auth failed");
+                return Task.CompletedTask;
+            },
+
+            OnChallenge = ctx =>
+            {
+                var logger = ctx.HttpContext.RequestServices
+                    .GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("Jwt");
+
+                logger.LogWarning("JWT challenge: error={Error}, desc={Desc}", ctx.Error, ctx.ErrorDescription);
+                return Task.CompletedTask;
+            }
         };
     });
+
 
 builder.Services.AddAuthorization();
 
@@ -47,17 +103,17 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo { Title = "Notifications API", Version = "v1" });
-    var securityScheme = new OpenApiSecurityScheme
+     var securityScheme = new OpenApiSecurityScheme
     {
         Name = "Authorization",
-        In = ParameterLocation.Header,
         Type = SecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT",
+        In = ParameterLocation.Header,
         Description = "JWT Token"
     };
     options.AddSecurityDefinition("Bearer", securityScheme);
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement { { securityScheme, Array.Empty<string>() } });
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement { { new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" } }, Array.Empty<string>() } });
 });
 
 var app = builder.Build();

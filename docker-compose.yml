@@ -57,6 +57,13 @@ services:
       Auth__JwtKey: ${ROLLOUT_JWT_KEY}
       ChatService__BaseUrl: http://chat-service:8080
       NotificationService__BaseUrl: http://notifications-service:8080
+
+      Logging__LogLevel__Default: Information
+      Logging__LogLevel__Microsoft: Warning
+      Logging__LogLevel__Microsoft_AspNetCore_Authentication: Debug
+      Logging__LogLevel__Microsoft_AspNetCore_Authentication_JwtBearer: Debug
+      Logging__LogLevel__Microsoft_IdentityModel: Debug
+
     networks:
       - rollout-net
 
@@ -100,6 +107,12 @@ services:
       Auth__JwtIssuer: ${ROLLOUT_JWT_ISSUER}
       Auth__JwtAudience: ${ROLLOUT_JWT_AUDIENCE}
       Auth__JwtKey: ${ROLLOUT_JWT_KEY}
+
+      Logging__LogLevel__Default: Information
+      Logging__LogLevel__Microsoft: Warning
+      Logging__LogLevel__Microsoft_AspNetCore_Authentication: Debug
+      Logging__LogLevel__Microsoft_AspNetCore_Authentication_JwtBearer: Debug
+      Logging__LogLevel__Microsoft_IdentityModel: Debug
     networks:
       - rollout-net
 
