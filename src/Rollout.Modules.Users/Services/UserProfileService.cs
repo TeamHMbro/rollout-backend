@@ -20,13 +20,13 @@ public sealed class UserProfileService
 
     public async Task<MyProfileResponse> GetMyProfileAsync(Guid userId, CancellationToken cancellationToken)
     {
-        var profile = await GetOrCreateProfileAsync(userId, cancellationToken);
+        var profile = await GetRequiredProfileAsync(userId, cancellationToken);
         return Map(profile);
     }
 
     public async Task<MyProfileResponse> UpdateMyProfileAsync(Guid userId, UpdateMyProfileRequest request, CancellationToken cancellationToken)
     {
-        var profile = await GetOrCreateProfileAsync(userId, cancellationToken);
+        var profile = await GetRequiredProfileAsync(userId, cancellationToken);
 
         if (request.Username is not null)
         {
@@ -79,7 +79,7 @@ public sealed class UserProfileService
         return Map(profile);
     }
 
-    private async Task<UserProfile> GetOrCreateProfileAsync(Guid userId, CancellationToken cancellationToken)
+    private async Task<UserProfile> GetRequiredProfileAsync(Guid userId, CancellationToken cancellationToken)
     {
         var profile = await _dbContext.UserProfiles
             .SingleOrDefaultAsync(x => x.UserId == userId, cancellationToken);
@@ -89,48 +89,7 @@ public sealed class UserProfileService
             return profile;
         }
 
-        var now = _timeProvider.GetUtcNow().UtcDateTime;
-        var username = await GenerateDefaultUsernameAsync(userId, cancellationToken);
-
-        profile = new UserProfile
-        {
-            UserId = userId,
-            Username = username,
-            DisplayName = username,
-            CreatedAtUtc = now
-        };
-
-        _dbContext.UserProfiles.Add(profile);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return profile;
-    }
-
-    private async Task<string> GenerateDefaultUsernameAsync(Guid userId, CancellationToken cancellationToken)
-    {
-        var baseValue = $"user{userId:N}"[..12];
-
-        var exists = await _dbContext.UserProfiles
-            .AnyAsync(x => x.Username == baseValue, cancellationToken);
-
-        if (!exists)
-        {
-            return baseValue;
-        }
-
-        for (var i = 1; i <= 1000; i++)
-        {
-            var candidate = $"{baseValue}{i}";
-            var taken = await _dbContext.UserProfiles
-                .AnyAsync(x => x.Username == candidate, cancellationToken);
-
-            if (!taken)
-            {
-                return candidate;
-            }
-        }
-
-        throw new AppException(StatusCodes.Status500InternalServerError, "username_generation_failed", "Failed to generate username.");
+        throw new AppException(StatusCodes.Status404NotFound, "profile_not_found", "Profile was not found.");
     }
 
     private static MyProfileResponse Map(UserProfile profile)

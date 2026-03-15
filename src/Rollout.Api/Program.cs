@@ -1,11 +1,18 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Rollout.Api.HealthChecks;
+using Rollout.Api.Seeding;
 using Rollout.Modules.Auth;
+using Rollout.Modules.Auth.Data;
 using Rollout.Modules.Events;
+using Rollout.Modules.Events.Data;
 using Rollout.Modules.Users;
+using Rollout.Modules.Users.Data;
 using Rollout.Shared.Auth;
 using Rollout.Shared.Middleware;
 
@@ -15,9 +22,19 @@ builder.Configuration.AddEnvironmentVariables();
 
 builder.Services.AddSingleton(TimeProvider.System);
 
-builder.Services.AddHealthChecks();
+builder.Services.Configure<DevSeedOptions>(builder.Configuration.GetSection("Seeding"));
+builder.Services.AddScoped<DevDataSeeder>();
+
+builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
 builder.Services.AddAuthorization();
 builder.Services.AddEndpointsApiExplorer();
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 builder.Services.AddAuthModule(builder.Configuration);
 builder.Services.AddUsersModule(builder.Configuration);
@@ -76,6 +93,32 @@ builder.Services.AddSwaggerGen(options =>
 var app = builder.Build();
 
 app.UseMiddleware<ExceptionMiddleware>();
+app.UseForwardedHeaders();
+
+using (var scope = app.Services.CreateScope())
+{
+    var authDb = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
+    var usersDb = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+    var eventsDb = scope.ServiceProvider.GetRequiredService<EventsDbContext>();
+
+    if (authDb.Database.IsRelational())
+    {
+        authDb.Database.Migrate();
+    }
+
+    if (usersDb.Database.IsRelational())
+    {
+        usersDb.Database.Migrate();
+    }
+
+    if (eventsDb.Database.IsRelational())
+    {
+        eventsDb.Database.Migrate();
+    }
+
+    var seeder = scope.ServiceProvider.GetRequiredService<DevDataSeeder>();
+    await seeder.SeedAsync(CancellationToken.None);
+}
 
 app.UseSwagger();
 app.UseSwaggerUI(options =>

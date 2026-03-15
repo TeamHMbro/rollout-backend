@@ -1,0 +1,9 @@
+set -e
+
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres <<EOSQL
+SELECT 'CREATE DATABASE "${ROLLOUT_AUTH_DB}"'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${ROLLOUT_AUTH_DB}') \gexec
+
+SELECT 'CREATE DATABASE "${ROLLOUT_CORE_DB}"'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${ROLLOUT_CORE_DB}') \gexec
+EOSQL

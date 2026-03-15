@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.Extensions.DependencyInjection;
 using Rollout.IntegrationTests.Infrastructure;
+using Rollout.Modules.Users.Data;
 using Xunit;
 
 namespace Rollout.IntegrationTests.Users;
@@ -43,6 +45,29 @@ public sealed class UsersEndpointsTests
     }
 
     [Fact]
+    public async Task Register_Creates_Profile_Immediately()
+    {
+        using var factory = new RolloutApiFactory();
+        using var anonymousClient = factory.CreateClient();
+
+        var email = $"user-{Guid.NewGuid():N}@example.com";
+        var tokens = await TestApi.RegisterAsync(anonymousClient, email);
+
+        using var client = TestApi.CreateAuthorizedClient(factory, tokens.AccessToken);
+
+        var response = await client.GetAsync("/users/me");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var profile = await response.Content.ReadFromJsonAsync<MyProfileResponse>();
+
+        Assert.NotNull(profile);
+        Assert.NotEqual(Guid.Empty, profile!.UserId);
+        Assert.False(string.IsNullOrWhiteSpace(profile.Username));
+        Assert.False(string.IsNullOrWhiteSpace(profile.DisplayName));
+    }
+
+    [Fact]
     public async Task GetMe_Without_Token_Returns_Unauthorized()
     {
         using var factory = new RolloutApiFactory();
@@ -76,5 +101,29 @@ public sealed class UsersEndpointsTests
         });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetMe_Returns_NotFound_When_Profile_Is_Missing()
+    {
+        using var factory = new RolloutApiFactory();
+        using var anonymousClient = factory.CreateClient();
+
+        var email = $"user-{Guid.NewGuid():N}@example.com";
+        var tokens = await TestApi.RegisterAsync(anonymousClient, email);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+            var profile = dbContext.UserProfiles.Single();
+            dbContext.UserProfiles.Remove(profile);
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var client = TestApi.CreateAuthorizedClient(factory, tokens.AccessToken);
+
+        var response = await client.GetAsync("/users/me");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 }

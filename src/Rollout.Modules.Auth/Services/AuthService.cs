@@ -6,6 +6,8 @@ using Microsoft.Extensions.Options;
 using Rollout.Modules.Auth.Data;
 using Rollout.Modules.Auth.Dtos;
 using Rollout.Modules.Auth.Entities;
+using Rollout.Modules.Users.Data;
+using Rollout.Modules.Users.Entities;
 using Rollout.Shared.Auth;
 using Rollout.Shared.Exceptions;
 
@@ -14,6 +16,7 @@ namespace Rollout.Modules.Auth.Services;
 public sealed class AuthService
 {
     private readonly AuthDbContext _dbContext;
+    private readonly UsersDbContext _usersDbContext;
     private readonly PasswordHasher _passwordHasher;
     private readonly JwtTokenService _jwtTokenService;
     private readonly JwtOptions _jwtOptions;
@@ -21,12 +24,14 @@ public sealed class AuthService
 
     public AuthService(
         AuthDbContext dbContext,
+        UsersDbContext usersDbContext,
         PasswordHasher passwordHasher,
         JwtTokenService jwtTokenService,
         IOptions<JwtOptions> jwtOptions,
         TimeProvider timeProvider)
     {
         _dbContext = dbContext;
+        _usersDbContext = usersDbContext;
         _passwordHasher = passwordHasher;
         _jwtTokenService = jwtTokenService;
         _jwtOptions = jwtOptions.Value;
@@ -60,6 +65,16 @@ public sealed class AuthService
             CreatedAtUtc = now
         };
 
+        var username = await GenerateDefaultUsernameAsync(user.Id, cancellationToken);
+
+        var profile = new UserProfile
+        {
+            UserId = user.Id,
+            Username = username,
+            DisplayName = username,
+            CreatedAtUtc = now
+        };
+
         var refreshTokenValue = _jwtTokenService.GenerateRefreshToken();
         var refreshTokenEntity = new RefreshToken
         {
@@ -74,6 +89,18 @@ public sealed class AuthService
         _dbContext.RefreshTokens.Add(refreshTokenEntity);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            _usersDbContext.UserProfiles.Add(profile);
+            await _usersDbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            _dbContext.Users.Remove(user);
+            await _dbContext.SaveChangesAsync(CancellationToken.None);
+            throw;
+        }
 
         var accessToken = _jwtTokenService.GenerateAccessToken(user);
 
@@ -225,6 +252,33 @@ public sealed class AuthService
             UserId = user.Id,
             Email = user.Email
         };
+    }
+
+    private async Task<string> GenerateDefaultUsernameAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var baseValue = $"user{userId:N}"[..12];
+
+        var exists = await _usersDbContext.UserProfiles
+            .AnyAsync(x => x.Username == baseValue, cancellationToken);
+
+        if (!exists)
+        {
+            return baseValue;
+        }
+
+        for (var i = 1; i <= 1000; i++)
+        {
+            var candidate = $"{baseValue}{i}";
+            var taken = await _usersDbContext.UserProfiles
+                .AnyAsync(x => x.Username == candidate, cancellationToken);
+
+            if (!taken)
+            {
+                return candidate;
+            }
+        }
+
+        throw new AppException(StatusCodes.Status500InternalServerError, "username_generation_failed", "Failed to generate username.");
     }
 
     private static string NormalizeEmail(string? email)

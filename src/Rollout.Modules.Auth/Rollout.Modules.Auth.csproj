@@ -5,6 +5,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Rollout.Shared\Rollout.Shared.csproj" />
+    <ProjectReference Include="..\Rollout.Modules.Users\Rollout.Modules.Users.csproj" />
   </ItemGroup>
 
   <ItemGroup>

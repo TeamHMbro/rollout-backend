@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: rollout-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - rollout-postgres-data:/var/lib/postgresql/data
+      - ./deploy/postgres/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  rollout-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rollout-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__AuthDb: Host=postgres;Port=5432;Database=${ROLLOUT_AUTH_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      ConnectionStrings__CoreDb: Host=postgres;Port=5432;Database=${ROLLOUT_CORE_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      Auth__JwtKey: ${ROLLOUT_JWT_KEY}
+      Auth__JwtIssuer: ${ROLLOUT_JWT_ISSUER}
+      Auth__JwtAudience: ${ROLLOUT_JWT_AUDIENCE}
+      Auth__AccessTokenLifetimeMinutes: ${ROLLOUT_ACCESS_TOKEN_LIFETIME_MINUTES}
+      Auth__RefreshTokenLifetimeDays: ${ROLLOUT_REFRESH_TOKEN_LIFETIME_DAYS}
+    ports:
+      - "8080:8080"
+
+volumes:
+  rollout-postgres-data:
