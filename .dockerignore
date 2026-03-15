@@ -1,0 +1,9 @@
+.git
+.gitignore
+.idea
+.vs
+**/bin
+**/obj
+tests
+README.md
+.DS_Store
