@@ -99,3 +99,5 @@ app.MapUsersModule();
 app.MapEventsModule();
 
 app.Run();
+
+public partial class Program;
