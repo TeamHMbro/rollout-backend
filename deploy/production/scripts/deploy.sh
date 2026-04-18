@@ -22,4 +22,14 @@ echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" pull
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --remove-orphans
-docker image prune -f
+
+for i in {1..30}; do
+  if curl -fsS http://127.0.0.1:8080/health > /dev/null; then
+    docker image prune -f
+    exit 0
+  fi
+  sleep 2
+done
+
+docker logs rollout-api --tail 200
+exit 1

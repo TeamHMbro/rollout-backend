@@ -117,6 +117,5 @@ jobs:
 
           ssh -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" '
             chmod +x /opt/rollout/deploy.sh && \
-            /opt/rollout/deploy.sh ${{ github.sha }} && \
-            curl -fsS http://127.0.0.1:8080/health
+            /opt/rollout/deploy.sh ${{ github.sha }}
           '
