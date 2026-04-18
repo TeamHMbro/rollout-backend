@@ -1,9 +1,6 @@
 name: ci-cd
 
 on:
-  pull_request:
-    branches:
-      - main
   push:
     branches:
       - main
@@ -34,7 +31,6 @@ jobs:
         run: dotnet test Rollout.sln -c Release --no-restore
 
   docker:
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     needs: test
 
@@ -63,10 +59,8 @@ jobs:
             ${{ env.IMAGE_NAME }}:latest
 
   deploy:
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    needs:
-      - docker
+    needs: docker
 
     steps:
       - uses: actions/checkout@v4
@@ -89,6 +83,15 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -p "$SERVER_PORT" "$SERVER_HOST" >> ~/.ssh/known_hosts
 
+      - name: Prepare remote directories
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+        run: |
+          SERVER_PORT="${SERVER_PORT:-22}"
+          ssh -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" 'mkdir -p /opt/rollout/deploy/postgres/init'
+
       - name: Upload deployment files
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
@@ -100,8 +103,6 @@ jobs:
           scp -P "$SERVER_PORT" deploy/production/docker-compose.yml "$SERVER_USER@$SERVER_HOST:/opt/rollout/docker-compose.yml"
           scp -P "$SERVER_PORT" deploy/postgres/init/01-create-databases.sh "$SERVER_USER@$SERVER_HOST:/opt/rollout/deploy/postgres/init/01-create-databases.sh"
           scp -P "$SERVER_PORT" deploy/production/scripts/deploy.sh "$SERVER_USER@$SERVER_HOST:/opt/rollout/deploy.sh"
-          scp -P "$SERVER_PORT" deploy/production/scripts/rollback.sh "$SERVER_USER@$SERVER_HOST:/opt/rollout/rollback.sh"
-          scp -P "$SERVER_PORT" deploy/production/scripts/backup.sh "$SERVER_USER@$SERVER_HOST:/opt/rollout/backup.sh"
 
       - name: Deploy
         env:
@@ -112,7 +113,7 @@ jobs:
           SERVER_PORT="${SERVER_PORT:-22}"
 
           ssh -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" '
-            chmod +x /opt/rollout/deploy.sh /opt/rollout/rollback.sh /opt/rollout/backup.sh && \
+            chmod +x /opt/rollout/deploy.sh && \
             /opt/rollout/deploy.sh ${{ github.sha }} && \
             curl -fsS http://127.0.0.1:8080/health
           '

@@ -14,7 +14,6 @@ services:
     volumes:
       - rollout-postgres-data:/var/lib/postgresql/data
       - /opt/rollout/deploy/postgres/init:/docker-entrypoint-initdb.d:ro
-      - /opt/rollout/backups:/backups
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d postgres"]
       interval: 10s
@@ -45,10 +44,13 @@ services:
       Auth__JwtAudience: ${ROLLOUT_JWT_AUDIENCE}
       Auth__AccessTokenLifetimeMinutes: ${ROLLOUT_ACCESS_TOKEN_LIFETIME_MINUTES}
       Auth__RefreshTokenLifetimeDays: ${ROLLOUT_REFRESH_TOKEN_LIFETIME_DAYS}
+      Cors__AllowedOrigins__0: ${CORS_ORIGIN_0}
+      Cors__AllowedOrigins__1: ${CORS_ORIGIN_1}
+      Cors__AllowedOrigins__2: ${CORS_ORIGIN_2}
       Seeding__Enabled: "false"
       Logging__Console__FormatterName: json
     ports:
-      - "127.0.0.1:8080:8080"
+      - "8080:8080"
     logging:
       driver: json-file
       options:
