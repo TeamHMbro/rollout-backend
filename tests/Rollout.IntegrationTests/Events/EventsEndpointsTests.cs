@@ -235,4 +235,83 @@ public sealed class EventsEndpointsTests
         Assert.NotNull(calendar);
         Assert.Contains(calendar!.Items, x => x.EventId == eventId);
     }
+    
+    [Fact]
+    public async Task Feed_Search_Filters_And_Sort_Work()
+    {
+        using var factory = new RolloutApiFactory();
+        using var anonymousClient = factory.CreateClient();
+
+        var ownerTokens = await TestApi.RegisterAsync(anonymousClient, $"owner-{Guid.NewGuid():N}@example.com");
+        using var ownerClient = TestApi.CreateAuthorizedClient(factory, ownerTokens.AccessToken);
+
+        var earlyEventId = await TestApi.CreateEventAsync(
+            ownerClient,
+            title: "Morning Tennis",
+            description: "Outdoor tennis practice",
+            city: "Almaty",
+            placeName: "Central Court",
+            category: "sport",
+            startAtUtc: DateTime.UtcNow.AddDays(1),
+            endAtUtc: DateTime.UtcNow.AddDays(1).AddHours(2));
+
+        await TestApi.CreateEventAsync(
+            ownerClient,
+            title: "Board Games Night",
+            description: "Play board games together",
+            city: "Astana",
+            placeName: "Anticafe",
+            category: "games",
+            startAtUtc: DateTime.UtcNow.AddDays(2),
+            endAtUtc: DateTime.UtcNow.AddDays(2).AddHours(2));
+
+        var response = await anonymousClient.GetAsync("/events/feed?q=tennis&city=Almaty&category=sport&sort=soon&page=1&pageSize=20");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var feed = await response.Content.ReadFromJsonAsync<PagedResponse<EventListItemResponse>>();
+
+        Assert.NotNull(feed);
+        Assert.Single(feed!.Items);
+        Assert.Equal(earlyEventId, feed.Items.First().EventId);
+        Assert.Equal(4, feed.Items.First().AvailableSpots);
+        Assert.False(feed.Items.First().IsFull);
+    }
+
+    [Fact]
+    public async Task Feed_OnlyAvailable_Excludes_Full_Events()
+    {
+        using var factory = new RolloutApiFactory();
+        using var anonymousClient = factory.CreateClient();
+
+        var ownerTokens = await TestApi.RegisterAsync(anonymousClient, $"owner-{Guid.NewGuid():N}@example.com");
+        var memberTokens = await TestApi.RegisterAsync(anonymousClient, $"member-{Guid.NewGuid():N}@example.com");
+
+        using var ownerClient = TestApi.CreateAuthorizedClient(factory, ownerTokens.AccessToken);
+        using var memberClient = TestApi.CreateAuthorizedClient(factory, memberTokens.AccessToken);
+
+        var fullEventId = await TestApi.CreateEventAsync(ownerClient, title: "Full Event", maxMembers: 1);
+        var availableEventId = await TestApi.CreateEventAsync(ownerClient, title: "Available Event", maxMembers: 2);
+
+        var response = await anonymousClient.GetAsync("/events/feed?onlyAvailable=true&page=1&pageSize=20");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var feed = await response.Content.ReadFromJsonAsync<PagedResponse<EventListItemResponse>>();
+
+        Assert.NotNull(feed);
+        Assert.DoesNotContain(feed!.Items, x => x.EventId == fullEventId);
+        Assert.Contains(feed.Items, x => x.EventId == availableEventId);
+    }
+
+    [Fact]
+    public async Task Feed_Invalid_Sort_Returns_BadRequest()
+    {
+        using var factory = new RolloutApiFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/events/feed?sort=wrong&page=1&pageSize=20");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
 }

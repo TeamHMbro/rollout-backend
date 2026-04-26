@@ -55,6 +55,16 @@ internal sealed class EventListItemResponse
 {
     public long EventId { get; set; }
     public string Title { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string City { get; set; } = string.Empty;
+    public string? PlaceName { get; set; }
+    public string? Category { get; set; }
+    public DateTime StartAtUtc { get; set; }
+    public DateTime EndAtUtc { get; set; }
+    public int MembersCount { get; set; }
+    public int MaxMembers { get; set; }
+    public int AvailableSpots { get; set; }
+    public bool IsFull { get; set; }
     public string Status { get; set; } = string.Empty;
     public bool IsJoined { get; set; }
     public bool IsCreator { get; set; }
@@ -84,3 +94,4 @@ internal sealed class ProblemResponse
     public string? Detail { get; set; }
     public Dictionary<string, object>? Extensions { get; set; }
 }
+

@@ -34,7 +34,11 @@ internal static class TestApi
     public static async Task<long> CreateEventAsync(
         HttpClient client,
         string title = "Board Games Night",
+        string description = "Play board games together",
         string city = "Almaty",
+        string placeName = "Anticafe",
+        string address = "Abylai Khan 10",
+        string category = "games",
         int maxMembers = 5,
         DateTime? startAtUtc = null,
         DateTime? endAtUtc = null)
@@ -45,11 +49,11 @@ internal static class TestApi
         var response = await client.PostAsJsonAsync("/events", new
         {
             Title = title,
-            Description = "Play board games together",
+            Description = description,
             City = city,
-            PlaceName = "Anticafe",
-            Address = "Abylai Khan 10",
-            Category = "games",
+            PlaceName = placeName,
+            Address = address,
+            Category = category,
             StartAtUtc = start,
             EndAtUtc = end,
             MaxMembers = maxMembers

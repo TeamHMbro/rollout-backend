@@ -28,6 +28,8 @@ public sealed class EventListItemResponse
     public DateTime EndAtUtc { get; set; }
     public int MembersCount { get; set; }
     public int MaxMembers { get; set; }
+    public int AvailableSpots { get; set; }
+    public bool IsFull { get; set; }
     public string Status { get; set; } = string.Empty;
     public bool IsJoined { get; set; }
     public bool IsCreator { get; set; }

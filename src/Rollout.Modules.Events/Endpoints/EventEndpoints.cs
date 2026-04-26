@@ -23,16 +23,20 @@ public static class EventEndpoints
 
         group.MapGet("/feed", async (
             ClaimsPrincipal principal,
+            string? q,
             string? city,
+            string? category,
             DateTime? from,
             DateTime? to,
+            bool? onlyAvailable,
+            string? sort,
             int page,
             int pageSize,
             EventService service,
             CancellationToken cancellationToken) =>
         {
             var currentUserId = principal.TryGetUserId();
-            var response = await service.GetFeedAsync(city, from, to, page, pageSize, currentUserId, cancellationToken);
+            var response = await service.GetFeedAsync(q, city, category, from, to, onlyAvailable, sort, page, pageSize, currentUserId, cancellationToken);
             return Results.Ok(response);
         });
 

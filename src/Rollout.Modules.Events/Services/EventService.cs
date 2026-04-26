@@ -106,9 +106,13 @@ public sealed class EventService
     }
 
     public async Task<PagedResponse<EventListItemResponse>> GetFeedAsync(
+        string? q,
         string? city,
+        string? category,
         DateTime? from,
         DateTime? to,
+        bool? onlyAvailable,
+        string? sort,
         int page,
         int pageSize,
         Guid? currentUserId,
@@ -121,10 +125,27 @@ public sealed class EventService
             .AsNoTracking()
             .Where(x => x.Status == EventStatus.Active);
 
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var normalizedQuery = q.Trim().ToLowerInvariant();
+
+            query = query.Where(x =>
+                x.Title.ToLower().Contains(normalizedQuery) ||
+                x.Description.ToLower().Contains(normalizedQuery) ||
+                (x.PlaceName != null && x.PlaceName.ToLower().Contains(normalizedQuery)) ||
+                (x.Address != null && x.Address.ToLower().Contains(normalizedQuery)));
+        }
+
         if (!string.IsNullOrWhiteSpace(city))
         {
             var normalizedCity = city.Trim().ToLowerInvariant();
             query = query.Where(x => x.City.ToLower() == normalizedCity);
+        }
+
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            var normalizedCategory = category.Trim().ToLowerInvariant();
+            query = query.Where(x => x.Category != null && x.Category.ToLower() == normalizedCategory);
         }
 
         if (from.HasValue)
@@ -139,10 +160,16 @@ public sealed class EventService
             query = query.Where(x => x.StartAtUtc <= toUtc);
         }
 
+        if (onlyAvailable == true)
+        {
+            query = query.Where(x => _eventsDbContext.EventMembers.Count(m => m.EventId == x.Id) < x.MaxMembers);
+        }
+
+        query = ApplyFeedSorting(query, sort);
+
         var totalCount = await query.CountAsync(cancellationToken);
 
         var events = await query
-            .OrderBy(x => x.StartAtUtc)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
@@ -509,22 +536,30 @@ public sealed class EventService
         var creatorsLookup = await GetUserSummariesAsync(creatorIds, cancellationToken);
 
         return events
-            .Select(x => new EventListItemResponse
+            .Select(x =>
             {
-                EventId = x.Id,
-                Title = x.Title,
-                Description = x.Description,
-                City = x.City,
-                PlaceName = x.PlaceName,
-                Category = x.Category,
-                StartAtUtc = x.StartAtUtc,
-                EndAtUtc = x.EndAtUtc,
-                MembersCount = membersCountLookup.GetValueOrDefault(x.Id),
-                MaxMembers = x.MaxMembers,
-                Status = MapStatus(x.Status),
-                IsJoined = joinedEventIds.Contains(x.Id),
-                IsCreator = currentUserId == x.CreatorUserId,
-                Creator = creatorsLookup[x.CreatorUserId]
+                var membersCount = membersCountLookup.GetValueOrDefault(x.Id);
+                var availableSpots = Math.Max(x.MaxMembers - membersCount, 0);
+
+                return new EventListItemResponse
+                {
+                    EventId = x.Id,
+                    Title = x.Title,
+                    Description = x.Description,
+                    City = x.City,
+                    PlaceName = x.PlaceName,
+                    Category = x.Category,
+                    StartAtUtc = x.StartAtUtc,
+                    EndAtUtc = x.EndAtUtc,
+                    MembersCount = membersCount,
+                    MaxMembers = x.MaxMembers,
+                    AvailableSpots = availableSpots,
+                    IsFull = availableSpots == 0,
+                    Status = MapStatus(x.Status),
+                    IsJoined = joinedEventIds.Contains(x.Id),
+                    IsCreator = currentUserId == x.CreatorUserId,
+                    Creator = creatorsLookup[x.CreatorUserId]
+                };
             })
             .ToList();
     }
@@ -717,6 +752,23 @@ public sealed class EventService
             EventStatus.Active => "active",
             EventStatus.Cancelled => "cancelled",
             _ => "unknown"
+        };
+    }
+
+    private IQueryable<Event> ApplyFeedSorting(IQueryable<Event> query, string? sort)
+    {
+        var normalizedSort = string.IsNullOrWhiteSpace(sort)
+            ? "soon"
+            : sort.Trim().ToLowerInvariant();
+
+        return normalizedSort switch
+        {
+            "soon" => query.OrderBy(x => x.StartAtUtc).ThenByDescending(x => x.CreatedAtUtc),
+            "new" => query.OrderByDescending(x => x.CreatedAtUtc).ThenBy(x => x.StartAtUtc),
+            "popular" => query
+                .OrderByDescending(x => _eventsDbContext.EventMembers.Count(m => m.EventId == x.Id))
+                .ThenBy(x => x.StartAtUtc),
+            _ => throw new AppException(StatusCodes.Status400BadRequest, "invalid_feed_sort", "Feed sort must be soon, new, or popular.")
         };
     }
 }
